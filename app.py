@@ -1,11 +1,7 @@
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# ============================================================
-# 1. PAGE CONFIGURATION
-# ============================================================
 
 st.set_page_config(
     page_title="Premier League 2024-25 | Analytics",
@@ -14,9 +10,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ============================================================
-# 2. DARK BROADCAST THEME
-# ============================================================
 
 st.markdown("""
 <style>
@@ -117,10 +110,6 @@ footer {
 """, unsafe_allow_html=True)
 
 
-# ============================================================
-# 3. CHART THEME
-# ============================================================
-
 BACKGROUND = "#111827"
 TEXT_COLOR = "#E5E7EB"
 MUTED_COLOR = "#94A3B8"
@@ -160,10 +149,6 @@ def style_chart(ax, title, ylabel=None):
     ax.set_axisbelow(True)
 
 
-# ============================================================
-# 4. LOAD DATASET
-# ============================================================
-
 @st.cache_data
 def load_data():
     data = pd.read_csv("E0.csv")
@@ -189,9 +174,23 @@ def load_data():
     data["FTHG"] = pd.to_numeric(data["FTHG"], errors="coerce")
     data["FTAG"] = pd.to_numeric(data["FTAG"], errors="coerce")
 
-    data = data.dropna(
-        subset=required_columns
-    ).copy()
+    data = data.dropna(subset=required_columns).copy()
+
+    invalid_scores = (data["FTHG"] < 0) | (data["FTAG"] < 0)
+    if invalid_scores.any():
+        raise ValueError("The dataset contains negative goal values.")
+
+    valid_results = data["FTR"].isin(["H", "D", "A"])
+    if not valid_results.all():
+        raise ValueError("The dataset contains an unknown match result.")
+
+    result_mismatch = (
+        ((data["FTHG"] > data["FTAG"]) & (data["FTR"] != "H"))
+        | ((data["FTHG"] < data["FTAG"]) & (data["FTR"] != "A"))
+        | ((data["FTHG"] == data["FTAG"]) & (data["FTR"] != "D"))
+    )
+    if result_mismatch.any():
+        raise ValueError("Some match results do not agree with the final scores.")
 
     return data
 
@@ -204,16 +203,11 @@ except Exception as error:
     st.stop()
 
 
-# ============================================================
-# 5. TEAM STATISTICS
-# ============================================================
-
 teams = sorted(
     set(df["HomeTeam"].unique()) |
     set(df["AwayTeam"].unique())
 )
 
-# Match results
 
 home_wins = (
     df.loc[df["FTR"] == "H", "HomeTeam"]
@@ -251,7 +245,6 @@ away_losses = (
     .reindex(teams, fill_value=0)
 )
 
-# Goals scored
 
 home_goals = (
     df.groupby("HomeTeam")["FTHG"]
@@ -265,7 +258,6 @@ away_goals = (
     .reindex(teams, fill_value=0)
 )
 
-# Goals conceded
 
 home_conceded = (
     df.groupby("HomeTeam")["FTAG"]
@@ -279,10 +271,6 @@ away_conceded = (
     .reindex(teams, fill_value=0)
 )
 
-
-# ============================================================
-# 6. BUILD TEAM DATAFRAME
-# ============================================================
 
 team_data = pd.DataFrame(index=teams)
 
@@ -343,20 +331,6 @@ team_data["GD"] = (
 )
 
 
-# ============================================================
-# 7. DASHBOARD HEADER
-# ============================================================
-
-
-# ============================================================
-# 7. DASHBOARD HEADER
-# ============================================================
-
-
-# ============================================================
-# 7. DASHBOARD HEADER
-# ============================================================
-
 st.html("""
 <div style="
     background: linear-gradient(110deg, #25164A, #111827);
@@ -404,18 +378,6 @@ st.html("""
 """)
 
 
-
-# ============================================================
-# 8. SEASON OVERVIEW
-# ============================================================
-
-
-# ============================================================
-# 8. SEASON OVERVIEW — BROADCAST KPI CARDS
-# ============================================================
-
-# Calculate season statistics
-
 total_matches = len(df)
 total_teams = len(teams)
 
@@ -429,11 +391,9 @@ home_win_count = int((df["FTR"] == "H").sum())
 away_win_count = int((df["FTR"] == "A").sum())
 draw_count = int((df["FTR"] == "D").sum())
 
-# Section heading
 
 st.markdown("## SEASON OVERVIEW")
 
-# KPI card styling
 
 st.html("""
 <style>
@@ -470,7 +430,6 @@ st.html("""
 </style>
 """)
 
-# Create four KPI columns
 
 kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 
@@ -513,18 +472,8 @@ with kpi4:
 st.markdown("---")
 
 
-# ============================================================
-# 9. LEAGUE STANDINGS
-# ============================================================
-
-
-# ============================================================
-# 9. LEAGUE STANDINGS — BROADCAST STYLE
-# ============================================================
-
 st.markdown("## LEAGUE STANDINGS")
 
-# Calculate league positions
 
 league_table = (
     team_data.sort_values(
@@ -541,7 +490,6 @@ league_table.insert(
     range(1, len(league_table) + 1)
 )
 
-# Retain all existing columns
 
 display_columns = [
     "Position",
@@ -558,7 +506,6 @@ display_columns = [
 
 display_table = league_table[display_columns].copy()
 
-# Style the table
 
 def style_position(row):
     position = row["Position"]
@@ -619,19 +566,8 @@ st.dataframe(
 st.markdown("---")
 
 
-
-# ============================================================
-# 10. TEAM EXPLORER
-# ============================================================
-
-
-# ============================================================
-# 10. TEAM PERFORMANCE CENTRE — BROADCAST STYLE
-# ============================================================
-
 st.markdown("## TEAM PERFORMANCE CENTRE")
 
-# Team selector
 
 selected_team = st.selectbox(
     "SELECT A CLUB",
@@ -641,7 +577,6 @@ selected_team = st.selectbox(
 
 selected_stats = team_data.loc[selected_team]
 
-# Club information banner
 
 st.html(f"""
 <div style="
@@ -682,7 +617,6 @@ st.html(f"""
 </div>
 """)
 
-# Main statistics
 
 st.markdown("### SEASON STATISTICS")
 
@@ -712,7 +646,6 @@ with col4:
         f'{int(selected_stats["GD"]):+d}'
     )
 
-# Secondary statistics
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -742,7 +675,6 @@ with col4:
 
 st.markdown("---")
 
-# Home vs Away analysis
 
 st.markdown("### HOME VS AWAY PERFORMANCE")
 
@@ -816,14 +748,6 @@ plt.close(fig)
 
 st.markdown("---")
 
-# ============================================================
-# 11. ATTACKING PERFORMANCE
-# ============================================================
-
-
-# ============================================================
-# 11. ATTACKING PERFORMANCE
-# ============================================================
 
 st.markdown("## ATTACKING PERFORMANCE")
 
@@ -880,10 +804,6 @@ st.dataframe(
 st.markdown("---")
 
 
-# ============================================================
-# 12. DEFENSIVE PERFORMANCE
-# ============================================================
-
 st.markdown("## DEFENSIVE PERFORMANCE")
 
 best_defence = (
@@ -939,22 +859,8 @@ st.dataframe(
 st.markdown("---")
 
 
-# ============================================================
-# 13. HOME VS AWAY ANALYSIS
-# ============================================================
-
-
-# ============================================================
-# 13. HOME VS AWAY ANALYSIS — BROADCAST STYLE
-# ============================================================
-
 st.markdown("## HOME VS AWAY ANALYSIS")
 
-# Calculate match result statistics
-
-home_win_count = int((df["FTR"] == "H").sum())
-draw_count = int((df["FTR"] == "D").sum())
-away_win_count = int((df["FTR"] == "A").sum())
 
 home_win_rate = home_win_count / total_matches * 100
 draw_rate = draw_count / total_matches * 100
@@ -967,9 +873,6 @@ home_goal_difference = (
     df["FTHG"].sum() - df["FTAG"].sum()
 )
 
-# ------------------------------------------------------------
-# MATCH RESULT DISTRIBUTION
-# ------------------------------------------------------------
 
 st.markdown("### MATCH RESULT DISTRIBUTION")
 
@@ -1035,9 +938,6 @@ plt.close(fig)
 
 st.markdown("---")
 
-# ------------------------------------------------------------
-# HOME VS AWAY GOALS
-# ------------------------------------------------------------
 
 st.markdown("### GOAL SCORING COMPARISON")
 
@@ -1091,9 +991,6 @@ plt.close(fig)
 
 st.markdown("---")
 
-# ------------------------------------------------------------
-# HOME ADVANTAGE SUMMARY
-# ------------------------------------------------------------
 
 st.markdown("### HOME ADVANTAGE SUMMARY")
 
@@ -1138,15 +1035,6 @@ st.html(f"""
 st.markdown("---")
 
 
-# ============================================================
-# 14. ATTACK VS POINTS
-# ============================================================
-
-
-# ============================================================
-# 14. ATTACK VS POINTS
-# ============================================================
-
 st.markdown("## ATTACK VS POINTS")
 
 fig, ax = plt.subplots(figsize=(11, 5))
@@ -1164,7 +1052,7 @@ ax.scatter(
 
 style_chart(
     ax,
-    "DOES A STRONGER ATTACK LEAD TO MORE POINTS?",
+    "GOALS SCORED VS LEAGUE POINTS",
     "League Points"
 )
 
@@ -1191,10 +1079,6 @@ plt.close(fig)
 st.markdown("---")
 
 
-# ============================================================
-# 15. DEFENCE VS POINTS
-# ============================================================
-
 st.markdown("## DEFENCE VS POINTS")
 
 fig, ax = plt.subplots(figsize=(11, 5))
@@ -1212,7 +1096,7 @@ ax.scatter(
 
 style_chart(
     ax,
-    "DOES A STRONGER DEFENCE LEAD TO MORE POINTS?",
+    "GOALS CONCEDED VS LEAGUE POINTS",
     "League Points"
 )
 
@@ -1239,13 +1123,8 @@ plt.close(fig)
 st.markdown("---")
 
 
-# ============================================================
-# 16. MATCH GOAL DISTRIBUTION
-# ============================================================
-
 st.markdown("## MATCH GOAL DISTRIBUTION")
 
-# Calculate total goals in each match
 
 df["Total Match Goals"] = df["FTHG"] + df["FTAG"]
 
@@ -1290,7 +1169,6 @@ plt.tight_layout()
 st.pyplot(fig)
 plt.close(fig)
 
-# Distribution table
 
 st.markdown("### GOAL DISTRIBUTION DATA")
 
@@ -1314,15 +1192,6 @@ st.dataframe(
 
 st.markdown("---")
 
-
-# ============================================================
-# 17. FOOTER
-# ============================================================
-
-
-# ============================================================
-# 17. FOOTER
-# ============================================================
 
 st.html("""
 <div style="
